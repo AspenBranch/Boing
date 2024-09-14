@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html>
+<!-- Program exported to HTML using the KA Project Exporter by @MushyAvocado 
+https://www.khanacademy.org/computer-programming/ka-project-exporter/5195486791385088
+-->
+	
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+	<title>Boing</title>
+	<style>
+		
+		
+		/* Change the color as you want */
+		:root {
+			--background-color: #000000;
+		}
+		
+		
+		html, body, #wrapper {
+			overflow: hidden;
+			width: 100%;
+		    height: 100%;
+			margin: 0px;
+			padding: 0px;
+		    width: calc(100% + 1px);
+		}
+		
+		body {
+		    background-color: var(--background-color);
+		}
+		
+		
+		canvas {
+			width: fit-content;
+			height: fit-content;
+		}
+		
+		canvas:focus {
+			outline: none;
+		}
+		
+		/* Automatically fits to the remaining height and centers the canvas it contains */
+		#wrapper {
+			padding: 0px;
+			margin: 0px;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			width: 100%;
+		}
+		
+</style>
+</head>
+<body id="wrapper">
+    <!-- Canvases with a class of "sketch" are applied to the program in the order runPJS() is called. -->
+    <canvas class="sketch"></canvas>
+	<!-- Load the PJS library -->
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/Khan/processing-js@master/processing.js"></script>
+	<!-- The exporter script must be loaded before the program script -->
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/Mushy-Avocado/KA-exporter@main/exporter.js"></script>
+	<!-- Run Khan Academy program and import PJS -->
+	<script type="application/javascript">
+		
+		
+		function program() {
+		    
+		    title("Boing");
+		    size(600, 600);
+		    
+		    // All code goes here
+			
+			
+			
+			noStroke();
+			rectMode(CENTER);
+			textAlign(CENTER, CENTER);
+			smooth();
+			
+			
+			var shake = 0;
+			var frequency = 120;
+			var mode = 'dark';
+			
+			var _window = (function(){
+			    return this;
+			})();//get the window
+			if (_window.matchMedia && _window.matchMedia('(prefers-color-scheme: dark)').matches) {
+			    mode = 'dark';
+			}
+			_window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+			    mode = e.matches ? "dark" : "light";
+			});
+			
+			
+			var scene = 'home';
+			var score = 0;
+			var clicked = false;
+			var scoreSize = 0;
+			var colors = {
+			    'light' : {
+			        'bg' : 240,  
+			        'player' : color(0, 200, 255),
+			        'enemy' : color(255, 100, 50),
+			        'enemyBad' : color(255, 50, 100),
+			        'score' : 255,
+			        'contrast': 0,
+			    },
+			    'dark' : {
+			        'bg' : 50,
+			        'player' : color(100, 200, 255),
+			        'enemy' : color(255, 200, 100),
+			        'enemyBad' : color(255, 50, 50),
+			        'score' : 100,
+			        'contrast' : 255,
+			    }
+			};
+			var frameStart, frameEnd;
+			var highscore = highscore || 0;
+			var mouse = '';
+			var pause = 0;
+			var fonts = {
+			    'main' : createFont('Segoe UI'),  
+			    'dark' : createFont('Segoe UI Black'),
+			};
+			
+			var bits = [];
+			function runBits(){
+			    for(var i = bits.length-1; i >= 0; --i){
+			        bits[i].all();
+			        
+			        if(bits[i].dead){
+			            bits.splice(i, 1);
+			            continue;
+			        }
+			    }
+			}
+			function bit(x, y, ang, mass, rainbow){
+			    this.x = x;
+			    this.y = y;
+			    this.ang = ang;
+			    this.mass = mass;
+			    this.vel = random(1, 2);
+			    this.dead = false;
+			    this.rainbow = rainbow;
+			    this.color = color(random(100, 255), random(100, 255), random(100, 255));
+			}
+			bit.prototype.all = function(){
+			    fill(colors[mode].enemy);
+			    if(this.rainbow){
+			        fill(this.color);
+			    }
+			    ellipse(this.x, this.y, this.mass, this.mass);
+			    
+			    this.x += cos(this.ang) * this.vel;
+			    this.y += sin(this.ang) * this.vel;
+			    
+			    this.mass = lerp(this.mass, 0, 0.1);
+			    
+			    if(floor(this.mass)-1 < 0){
+			        this.dead = true;
+			    }
+			};
+			
+			
+			var rings = [];
+			
+			function ring(x, y, size, sizeTo){
+			    this.x = x;
+			    this.y = y;
+			    this.size = size;
+			    this.sizeTo = sizeTo || size + 20;
+			    this.time = 0;
+			}
+			ring.prototype.all = function(){
+			    stroke(colors[mode].player);
+			    noFill();
+			    ellipse(this.x, this.y, this.size, this.size);
+			    noStroke();
+			    
+			    
+			    if(this.time > 100){
+			        this.size = lerp(this.size, 0, 0.2);
+			        if(floor(this.size) === 0){
+			            this.dead = true;
+			        }
+			    }else{
+			        this.size = lerp(this.size, this.sizeTo, 0.2);
+			    }
+			    this.time ++;    
+			};
+			function runRings(){
+			    for(var i = rings.length-1; i >= 0; --i){
+			        rings[i].all();
+			        if(rings[i].dead){
+			            rings.splice(i, 1);
+			            continue;
+			        }
+			    }
+			}
+			
+			
+			var rocks = [];
+			function rock(){
+			    this.ang = random(360);
+			    
+			    this.x = 200 + cos(this.ang) * width;
+			    this.y = 200 + sin(this.ang) * width;
+			    this.mass = random(25, 50);
+			    this.vel = 0;
+			    this.dead = false;
+			    this.trail = [];
+			}
+			rock.prototype = {
+			    draw: function(){
+			        fill(colors[mode].enemy);
+			        ellipse(this.x, this.y, this.mass, this.mass);
+			        
+			        fill(colors[mode].enemy, 50);
+			        for(var i = this.trail.length-1; i >= 0; --i){
+			            ellipse(this.trail[i][0], this.trail[i][1], this.trail[i][2], this.trail[i][2]);
+			            this.trail[i][2] -= 1;
+			            if(this.trail[i][2] < 0){
+			                this.trail.splice(i, 1);
+			            }
+			        }
+			    },
+			    update: function(){
+			        this.x += cos(this.ang) * this.vel;
+			        this.y += sin(this.ang) * this.vel;
+			        
+			        this.vel -= 0.01;
+			        
+			        if(this.vel < -5){
+			            this.dead = true;
+			        }
+			        
+			        if(frameCount%10 === 0){
+			            this.trail.push([this.x, this.y, this.mass]);
+			        }
+			    },
+			};
+			
+			var badRocks = [];
+			function badRock(){
+			    rock.call(this);
+			}
+			badRock.prototype = Object.create(rock.prototype);
+			badRock.prototype.draw = function(){
+			    fill(colors[mode].enemyBad);
+			    pushMatrix();
+			    translate(this.x, this.y);
+			    rotate(frameCount+this.ang);
+			    rect(0, 0, this.mass, this.mass);
+			    popMatrix();
+			    
+			    fill(colors[mode].enemyBad, 50);
+			    for(var i = this.trail.length-1; i >= 0; --i){
+			        ellipse(this.trail[i][0], this.trail[i][1], this.trail[i][2], this.trail[i][2]);
+			        this.trail[i][2] -= 1;
+			        if(this.trail[i][2] < 0){
+			            this.trail.splice(i, 1);
+			        }
+			    }
+			};
+			
+			var trans = {
+			    a: 0,
+			    vel: 15,
+			    switchTo: undefined,
+			    on: false,
+			    all: function(){
+			        
+			        
+			        if(this.on){
+			            fill(0, this.a);
+			            rect(width/2, height/2, width, height);
+			            
+			            this.a+=this.vel;
+			            
+			            if(this.a >= 260){
+			                if(typeof this.switchTo === 'string'){
+			                    scene = this.switchTo;
+			                }else{
+			                    this.switchTo();
+			                }
+			                this.vel *= -1;
+			            }
+			            if(this.a < 0){
+			                this.a = 0;
+			                this.on = false;
+			                this.vel *= -1;
+			            }
+			        }
+			    },
+			    start: function(where){
+			        this.on = true;
+			        this.switchTo = where;
+			    }
+			};
+			
+			function player(){
+			    this.x = 200;
+			    this.y = 200;
+			    
+			    this.mass = 50;
+			    
+			    this.xvel = 0;
+			    this.yvel = 0;
+			    
+			    this.trail = [];
+			}
+			player.prototype = {
+			    draw: function(){
+			        fill(colors[mode].player);
+			        ellipse(this.x, this.y, this.mass, this.mass);
+			        
+			        fill(colors[mode].player, 50);
+			        for(var i = this.trail.length-1; i >= 0; --i){
+			            ellipse(this.trail[i][0], this.trail[i][1], this.trail[i][2], this.trail[i][2]);
+			            this.trail[i][2] -= 1;
+			            if(this.trail[i][2] < 0){
+			                this.trail.splice(i, 1);
+			            }
+			        }
+			    },
+			    update: function(){
+			        var ang = atan2(this.y-mouseY, this.x-mouseX);
+			        
+			        this.xvel -= cos(ang)/this.mass*10;
+			        this.yvel -= sin(ang)/this.mass*10;
+			        
+			        this.x += this.xvel;
+			        this.y += this.yvel;
+			        
+			        
+			        if(this.x - (this.mass/2) < 0){
+			            this.xvel = abs(this.xvel)/2;
+			            this.x = (this.mass/2);
+			            shake = 5;
+			        }else if(this.x + (this.mass/2) > width){
+			            this.xvel = -abs(this.xvel)/2;
+			            this.x = width - (this.mass/2);
+			            shake = 5;
+			        }
+			        
+			        if(this.y - (this.mass/2) < 0){
+			            this.yvel = abs(this.yvel)/2;
+			            this.y = (this.mass/2);
+			            shake = 5;
+			        }else if(this.y + (this.mass/2) > height){
+			            this.yvel = -abs(this.yvel)/2;
+			            this.y = height - (this.mass/2);
+			            shake = 5;
+			        }
+			        
+			        if(frameCount%10 === 0){
+			            this.trail.push([this.x, this.y, this.mass]);
+			        }
+			        
+			        for(var i = badRocks.length-1; i >= 0; --i){
+			            if(dist(this.x, this.y, badRocks[i].x, badRocks[i].y) < this.mass/2 + (badRocks[i].mass/2)){
+			                trans.start('over');   
+			                
+			                if(score > highscore){
+			                    highscore = score;
+			                }
+			                
+			                this.xvel *= -1;
+			                this.yvel *= -1;
+			                
+			                shake = 10;
+			            }
+			        }
+			        
+			        for(var i = rocks.length-1; i >= 0; --i){
+			            if(dist(this.x, this.y, rocks[i].x, rocks[i].y) < this.mass/2 + (rocks[i].mass/2)){
+			                rocks[i].dead = true;
+			                shake = 10;
+			                this.xvel *= -0.1;
+			                this.yvel *= -0.1;
+			                
+			                for(var j = 0; j < rings.length; j++){
+			                    if(dist(this.x, this.y, rings[j].x, rings[j].y) < rings[j].size){
+			                        for(var z = 0; z < 5; z++){
+			                            bits.push(new bit(rocks[i].x, rocks[i].y, random(360), random(50, 100), true));
+			                        }
+			                        rings.push(new ring(this.x, this.y, 0, this.mass*5));
+			                        rings.push(new ring(this.x, this.y, this.mass, this.mass*5.1));
+			                        score += 5;
+			                        break;
+			                    }
+			                } 
+			                
+			                rings.push(new ring(this.x, this.y, 0, this.mass*2));
+			                rings.push(new ring(this.x, this.y, this.mass, this.mass*2.5));
+			                
+			                score ++;
+			                scoreSize = 1.5;
+			                
+			                for(var z = 0; z < 5; z++){
+			                    bits.push(new bit(rocks[i].x, rocks[i].y, random(360), random(40, 50)));
+			                }
+			            }
+			        }
+			    },
+			};
+			
+			var Player = new player();
+			
+			
+			function button(x, y, txt, w, clk){
+			    this.x = x;
+			    this.y = y;
+			    this.w = w;
+			    this.h = 50;
+			    this.msg = txt;
+			    
+			    this.showW = w;
+			    this.showH = this.h;
+			    this.onClick = clk;
+			}
+			button.prototype.doButtonStuff = function(){
+			    fill(0);
+			    rect(this.x, this.y, this.showW, this.showH, 5);
+			    
+			    fill(255);
+			    rect(this.x, this.y, this.showW-8, this.showH-8, 3);
+			    
+			    fill(0);
+			    text(this.msg, this.x, this.y);
+			    
+			    if(mouseX > this.x - (this.w/2) && mouseX < this.x + (this.w/2) && mouseY > this.y - (this.h/2) && mouseY < this.y + (this.h/2)){
+			        mouse = 'pointer';
+			        
+			        this.showH = lerp(this.showH, this.h+10, 0.2);
+			        
+			        if(clicked){
+			            this.onClick();
+			        }
+			        
+			    }else{
+			        this.showH = lerp(this.showH, this.h, 0.2);
+			    }
+			};
+			
+			var playBtn = new button(width/2, 350, 'PLAY', 330, function(){
+			        frequency = 100;
+			        trans.start('game');
+			        
+			        Player.x = width/2;
+			        Player.y = height/2;
+			        Player.xvel = 0;
+			        Player.yvel = 0;
+			        
+			        score = 0;
+			        
+			        rocks.length = 0;
+			        badRocks.length = 0;
+			        pause = 0;
+			        bits.length = 0;
+			        rings.length = 0;
+			        Player.trail.length = 0;
+			    }),
+			    howBtn = new button(width/2 - 90, 420, 'How', 150, function(){
+			        trans.start('how');
+			    }),
+			    themeBtn = new button(width/2 + 90, 420, 'Theme', 150, function(){
+			        trans.start(function(){
+			            mode = mode === 'light' ? 'dark':'light';
+			        });
+			    }),
+			    homeBtn = new button(width/2, 450, 'Return', 250, function(){
+			        trans.start('home');
+			    }),
+			    againBtn = new button(width/2, 520, 'Replay', 250, function(){
+			        trans.start('game');
+			        
+			        Player.x = width/2;
+			        Player.y = height/2;
+			        Player.xvel = 0;
+			        Player.yvel = 0;
+			        
+			        score = 0;
+			        
+			        rocks.length = 0;
+			        badRocks.length = 0;
+			        pause = 0;
+			        bits.length = 0;
+			        rings.length = 0;
+			        frequency = 100;
+			        Player.trail.length = 0;
+			    });
+			    
+			//scenes
+			function game(){
+			    if(frameCount%300 === 0 && frequency > 50){
+			        frequency --;
+			    }
+			    
+			    
+			    pushMatrix();
+			    translate(random(-shake, shake), random(-shake, shake));
+			    
+			    fill(colors[mode].score);
+			    pushMatrix();
+			    translate(width/2, height/2);
+			    scale(scoreSize);
+			    textFont(fonts.main, width/2);
+			    text(score, 0, 0);
+			    popMatrix();
+			    
+			    runBits();
+			    runRings();
+			    
+			    for(var i = rocks.length-1; i >= 0; --i){
+			        rocks[i].draw();
+			        
+			        if(pause < 20){
+			            rocks[i].update();
+			        }
+			        
+			        if(rocks[i].dead){
+			            rocks.splice(i, 1); 
+			            continue;
+			        }
+			    }
+			    
+			    for(var i = badRocks.length-1; i >= 0; --i){
+			        badRocks[i].draw();
+			        
+			        if(pause < 20){
+			            badRocks[i].update();
+			        }
+			        
+			        if(badRocks[i].dead){
+			            badRocks.splice(i, 1); 
+			            continue;
+			        }
+			    }
+			    
+			    Player.draw();
+			    
+			    
+			    if(pause < 20){
+			        Player.update();
+			    }
+			    
+			    if(shake > 0){
+			        shake -= 0.5;
+			    }
+			    
+			    if(pause < 50){
+			        if(frameCount%frequency === 0){
+			            rocks.push(new rock());
+			        }
+			        
+			        if(frameCount%frequency === 0){
+			            badRocks.push(new badRock());
+			        }
+			    }
+			    
+			    scoreSize = lerp(scoreSize, 1, 0.2);
+			    
+			    shake = constrain(shake, 0, 10);
+			    popMatrix();
+			    
+			    
+			    fill(mode === 'dark' ? 255:0, 50);
+			    ellipse(width-50, 50, pause+60, pause+60);
+			    
+			    fill(mode === 'dark' ? 0:255, 50);
+			    ellipse(width-50, 50, pause+50, pause+50);
+			    
+			    fill(mode === 'dark' ? 255:0, 50);
+			    rect(width-50 - 6, 50, 6, 24);
+			    rect(width-50 + 6, 50, 6, 24);
+			    
+			    textFont(fonts.dark, 80);
+			    fill(mode === 'dark' ? 255:0);
+			    text('Game Paused', width/2, height/2+ height*5-pause);
+			    
+			    if(dist(mouseX, mouseY, width-50, 50) < 25){
+			        pause = lerp(pause, height*5, 0.1);
+			    }else{
+			        pause = lerp(pause, 0, 0.1);
+			    }
+			    
+			}
+			function home(){
+			    
+			    
+			    textFont(fonts.main, 140);
+			    
+			    fill(colors[mode].contrast);
+			    text('B  ing', width/2, 150);
+			    rect(width/2 - 32, 226, 264, 10);
+			    
+			    textSize(20);
+			    text('Highscore: '+highscore, width/2, height-15);
+			    
+			    fill(colors[mode].player);
+			    ellipse(width/2 - 55, 170, 70, 70);
+			    fill(colors[mode].player, 50);
+			    ellipse(width/2 - 26, 99, 50, 50);
+			    ellipse(width/2 + 26, 68, 40, 40);
+			    ellipse(width/2 + 79, 73, 30, 30);
+			    ellipse(width/2 + 108, 107, 20, 20);
+			    
+			    textFont(fonts.dark, 30);
+			    playBtn.doButtonStuff();
+			    howBtn.doButtonStuff();
+			    themeBtn.doButtonStuff();
+			}
+			function over(){
+			    textFont(fonts.dark, 80);
+			    fill(colors[mode].contrast);
+			    text('Game Over', width/2, 150);
+			    
+			    pushMatrix();
+			    translate(width/2, height/2);
+			    scale(scoreSize);
+			    textFont(fonts.main, 40);
+			    text('Score: '+score, 0, 0);
+			    popMatrix();
+			    
+			    textSize(20);
+			    text('Highscore: '+highscore, width/2, height/2+45);
+			    
+			    scoreSize = lerp(scoreSize, 1.5, 0.2);
+			    
+			    textFont(fonts.dark, 30);
+			    homeBtn.doButtonStuff();
+			    againBtn.doButtonStuff();
+			}
+			function how(){
+			    textFont(fonts.dark, 80);
+			    fill(colors[mode].contrast);
+			    text('Instructions', width/2, 150);
+			    
+			    textFont(fonts.main);
+			    textSize(30);
+			    text('Use your mouse to move.\nDo not touch red squares.\nCollect Orange Circles.\nHit Circles inside a ring\nfor a 5 point combo', width/2, height/2+45);
+			    
+			    scoreSize = lerp(scoreSize, 1.5, 0.2);
+			    
+			    textFont(fonts.dark, 30);
+			    homeBtn.y = 550;
+			    homeBtn.doButtonStuff();
+			    homeBtn.y = 450;
+			}
+			
+			function draw(){
+			    frameStart = millis();
+			    
+			    background(colors[mode].bg);
+			    fill(mode === 'light' ? colors[mode].bg - 10 : colors[mode].bg + 5);
+			    ellipse(100, 0, 500, 500);
+			    ellipse(533, 0, 200, 200);
+			    ellipse(166, height, 300, 300);
+			    ellipse(469, 329, 250, 250);
+			    
+			    switch(scene){
+			        case 'home':
+			            home();
+			        break;
+			        case 'game':
+			            game();
+			        break;
+			        case 'over':
+			            over();
+			        break;
+			        case 'how':
+			            how();
+			        break;
+			    }
+			    
+			    frameEnd = millis()-frameStart;
+			    
+			
+			    cursor(mouse);
+			    mouse = '';
+			    clicked = false;
+			    
+			    trans.all();
+			}
+			
+			
+			mouseClicked = function(){
+			    clicked = true;
+			};
+			
+		}
+		
+		runPJS(program);
+		
+		// Add reload button on KA --> <script>
+		
+	</script>
+</body>
+
+</html><!DOCTYPE html>
+<html>
+<!-- Program exported to HTML using the KA Project Exporter by @MushyAvocado 
+https://www.khanacademy.org/computer-programming/ka-project-exporter/5195486791385088
+-->
+	
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+	<title>Boing</title>
+	<style>
+		
+		
+		/* Change the color as you want */
+		:root {
+			--background-color: #000000;
+		}
+		
+		
+		html, body, #wrapper {
+			overflow: hidden;
+			width: 100%;
+		    height: 100%;
+			margin: 0px;
+			padding: 0px;
+		    width: calc(100% + 1px);
+		}
+		
+		body {
+		    background-color: var(--background-color);
+		}
+		
+		
+		canvas {
+			width: fit-content;
+			height: fit-content;
+		}
+		
+		canvas:focus {
+			outline: none;
+		}
+		
+		/* Automatically fits to the remaining height and centers the canvas it contains */
+		#wrapper {
+			padding: 0px;
+			margin: 0px;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			width: 100%;
+		}
+		
+</style>
+</head>
+<body id="wrapper">
+    <!-- Canvases with a class of "sketch" are applied to the program in the order runPJS() is called. -->
+    <canvas class="sketch"></canvas>
+	<!-- Load the PJS library -->
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/Khan/processing-js@master/processing.js"></script>
+	<!-- The exporter script must be loaded before the program script -->
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/Mushy-Avocado/KA-exporter@main/exporter.js"></script>
+	<!-- Run Khan Academy program and import PJS -->
+	<script type="application/javascript">
+		
+		
+		function program() {
+		    
+		    title("Boing");
+		    size(600, 600);
+		    
+		    // All code goes here
+			
+			
+			
+			noStroke();
+			rectMode(CENTER);
+			textAlign(CENTER, CENTER);
+			smooth();
+			
+			
+			var shake = 0;
+			var frequency = 120;
+			var mode = 'dark';
+			
+			var _window = (function(){
+			    return this;
+			})();//get the window
+			if (_window.matchMedia && _window.matchMedia('(prefers-color-scheme: dark)').matches) {
+			    mode = 'dark';
+			}
+			_window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+			    mode = e.matches ? "dark" : "light";
+			});
+			
+			
+			var scene = 'home';
+			var score = 0;
+			var clicked = false;
+			var scoreSize = 0;
+			var colors = {
+			    'light' : {
+			        'bg' : 240,  
+			        'player' : color(0, 200, 255),
+			        'enemy' : color(255, 100, 50),
+			        'enemyBad' : color(255, 50, 100),
+			        'score' : 255,
+			        'contrast': 0,
+			    },
+			    'dark' : {
+			        'bg' : 50,
+			        'player' : color(100, 200, 255),
+			        'enemy' : color(255, 200, 100),
+			        'enemyBad' : color(255, 50, 50),
+			        'score' : 100,
+			        'contrast' : 255,
+			    }
+			};
+			var frameStart, frameEnd;
+			var highscore = highscore || 0;
+			var mouse = '';
+			var pause = 0;
+			var fonts = {
+			    'main' : createFont('Segoe UI'),  
+			    'dark' : createFont('Segoe UI Black'),
+			};
+			
+			var bits = [];
+			function runBits(){
+			    for(var i = bits.length-1; i >= 0; --i){
+			        bits[i].all();
+			        
+			        if(bits[i].dead){
+			            bits.splice(i, 1);
+			            continue;
+			        }
+			    }
+			}
+			function bit(x, y, ang, mass, rainbow){
+			    this.x = x;
+			    this.y = y;
+			    this.ang = ang;
+			    this.mass = mass;
+			    this.vel = random(1, 2);
+			    this.dead = false;
+			    this.rainbow = rainbow;
+			    this.color = color(random(100, 255), random(100, 255), random(100, 255));
+			}
+			bit.prototype.all = function(){
+			    fill(colors[mode].enemy);
+			    if(this.rainbow){
+			        fill(this.color);
+			    }
+			    ellipse(this.x, this.y, this.mass, this.mass);
+			    
+			    this.x += cos(this.ang) * this.vel;
+			    this.y += sin(this.ang) * this.vel;
+			    
+			    this.mass = lerp(this.mass, 0, 0.1);
+			    
+			    if(floor(this.mass)-1 < 0){
+			        this.dead = true;
+			    }
+			};
+			
+			
+			var rings = [];
+			
+			function ring(x, y, size, sizeTo){
+			    this.x = x;
+			    this.y = y;
+			    this.size = size;
+			    this.sizeTo = sizeTo || size + 20;
+			    this.time = 0;
+			}
+			ring.prototype.all = function(){
+			    stroke(colors[mode].player);
+			    noFill();
+			    ellipse(this.x, this.y, this.size, this.size);
+			    noStroke();
+			    
+			    
+			    if(this.time > 100){
+			        this.size = lerp(this.size, 0, 0.2);
+			        if(floor(this.size) === 0){
+			            this.dead = true;
+			        }
+			    }else{
+			        this.size = lerp(this.size, this.sizeTo, 0.2);
+			    }
+			    this.time ++;    
+			};
+			function runRings(){
+			    for(var i = rings.length-1; i >= 0; --i){
+			        rings[i].all();
+			        if(rings[i].dead){
+			            rings.splice(i, 1);
+			            continue;
+			        }
+			    }
+			}
+			
+			
+			var rocks = [];
+			function rock(){
+			    this.ang = random(360);
+			    
+			    this.x = 200 + cos(this.ang) * width;
+			    this.y = 200 + sin(this.ang) * width;
+			    this.mass = random(25, 50);
+			    this.vel = 0;
+			    this.dead = false;
+			    this.trail = [];
+			}
+			rock.prototype = {
+			    draw: function(){
+			        fill(colors[mode].enemy);
+			        ellipse(this.x, this.y, this.mass, this.mass);
+			        
+			        fill(colors[mode].enemy, 50);
+			        for(var i = this.trail.length-1; i >= 0; --i){
+			            ellipse(this.trail[i][0], this.trail[i][1], this.trail[i][2], this.trail[i][2]);
+			            this.trail[i][2] -= 1;
+			            if(this.trail[i][2] < 0){
+			                this.trail.splice(i, 1);
+			            }
+			        }
+			    },
+			    update: function(){
+			        this.x += cos(this.ang) * this.vel;
+			        this.y += sin(this.ang) * this.vel;
+			        
+			        this.vel -= 0.01;
+			        
+			        if(this.vel < -5){
+			            this.dead = true;
+			        }
+			        
+			        if(frameCount%10 === 0){
+			            this.trail.push([this.x, this.y, this.mass]);
+			        }
+			    },
+			};
+			
+			var badRocks = [];
+			function badRock(){
+			    rock.call(this);
+			}
+			badRock.prototype = Object.create(rock.prototype);
+			badRock.prototype.draw = function(){
+			    fill(colors[mode].enemyBad);
+			    pushMatrix();
+			    translate(this.x, this.y);
+			    rotate(frameCount+this.ang);
+			    rect(0, 0, this.mass, this.mass);
+			    popMatrix();
+			    
+			    fill(colors[mode].enemyBad, 50);
+			    for(var i = this.trail.length-1; i >= 0; --i){
+			        ellipse(this.trail[i][0], this.trail[i][1], this.trail[i][2], this.trail[i][2]);
+			        this.trail[i][2] -= 1;
+			        if(this.trail[i][2] < 0){
+			            this.trail.splice(i, 1);
+			        }
+			    }
+			};
+			
+			var trans = {
+			    a: 0,
+			    vel: 15,
+			    switchTo: undefined,
+			    on: false,
+			    all: function(){
+			        
+			        
+			        if(this.on){
+			            fill(0, this.a);
+			            rect(width/2, height/2, width, height);
+			            
+			            this.a+=this.vel;
+			            
+			            if(this.a >= 260){
+			                if(typeof this.switchTo === 'string'){
+			                    scene = this.switchTo;
+			                }else{
+			                    this.switchTo();
+			                }
+			                this.vel *= -1;
+			            }
+			            if(this.a < 0){
+			                this.a = 0;
+			                this.on = false;
+			                this.vel *= -1;
+			            }
+			        }
+			    },
+			    start: function(where){
+			        this.on = true;
+			        this.switchTo = where;
+			    }
+			};
+			
+			function player(){
+			    this.x = 200;
+			    this.y = 200;
+			    
+			    this.mass = 50;
+			    
+			    this.xvel = 0;
+			    this.yvel = 0;
+			    
+			    this.trail = [];
+			}
+			player.prototype = {
+			    draw: function(){
+			        fill(colors[mode].player);
+			        ellipse(this.x, this.y, this.mass, this.mass);
+			        
+			        fill(colors[mode].player, 50);
+			        for(var i = this.trail.length-1; i >= 0; --i){
+			            ellipse(this.trail[i][0], this.trail[i][1], this.trail[i][2], this.trail[i][2]);
+			            this.trail[i][2] -= 1;
+			            if(this.trail[i][2] < 0){
+			                this.trail.splice(i, 1);
+			            }
+			        }
+			    },
+			    update: function(){
+			        var ang = atan2(this.y-mouseY, this.x-mouseX);
+			        
+			        this.xvel -= cos(ang)/this.mass*10;
+			        this.yvel -= sin(ang)/this.mass*10;
+			        
+			        this.x += this.xvel;
+			        this.y += this.yvel;
+			        
+			        
+			        if(this.x - (this.mass/2) < 0){
+			            this.xvel = abs(this.xvel)/2;
+			            this.x = (this.mass/2);
+			            shake = 5;
+			        }else if(this.x + (this.mass/2) > width){
+			            this.xvel = -abs(this.xvel)/2;
+			            this.x = width - (this.mass/2);
+			            shake = 5;
+			        }
+			        
+			        if(this.y - (this.mass/2) < 0){
+			            this.yvel = abs(this.yvel)/2;
+			            this.y = (this.mass/2);
+			            shake = 5;
+			        }else if(this.y + (this.mass/2) > height){
+			            this.yvel = -abs(this.yvel)/2;
+			            this.y = height - (this.mass/2);
+			            shake = 5;
+			        }
+			        
+			        if(frameCount%10 === 0){
+			            this.trail.push([this.x, this.y, this.mass]);
+			        }
+			        
+			        for(var i = badRocks.length-1; i >= 0; --i){
+			            if(dist(this.x, this.y, badRocks[i].x, badRocks[i].y) < this.mass/2 + (badRocks[i].mass/2)){
+			                trans.start('over');   
+			                
+			                if(score > highscore){
+			                    highscore = score;
+			                }
+			                
+			                this.xvel *= -1;
+			                this.yvel *= -1;
+			                
+			                shake = 10;
+			            }
+			        }
+			        
+			        for(var i = rocks.length-1; i >= 0; --i){
+			            if(dist(this.x, this.y, rocks[i].x, rocks[i].y) < this.mass/2 + (rocks[i].mass/2)){
+			                rocks[i].dead = true;
+			                shake = 10;
+			                this.xvel *= -0.1;
+			                this.yvel *= -0.1;
+			                
+			                for(var j = 0; j < rings.length; j++){
+			                    if(dist(this.x, this.y, rings[j].x, rings[j].y) < rings[j].size){
+			                        for(var z = 0; z < 5; z++){
+			                            bits.push(new bit(rocks[i].x, rocks[i].y, random(360), random(50, 100), true));
+			                        }
+			                        rings.push(new ring(this.x, this.y, 0, this.mass*5));
+			                        rings.push(new ring(this.x, this.y, this.mass, this.mass*5.1));
+			                        score += 5;
+			                        break;
+			                    }
+			                } 
+			                
+			                rings.push(new ring(this.x, this.y, 0, this.mass*2));
+			                rings.push(new ring(this.x, this.y, this.mass, this.mass*2.5));
+			                
+			                score ++;
+			                scoreSize = 1.5;
+			                
+			                for(var z = 0; z < 5; z++){
+			                    bits.push(new bit(rocks[i].x, rocks[i].y, random(360), random(40, 50)));
+			                }
+			            }
+			        }
+			    },
+			};
+			
+			var Player = new player();
+			
+			
+			function button(x, y, txt, w, clk){
+			    this.x = x;
+			    this.y = y;
+			    this.w = w;
+			    this.h = 50;
+			    this.msg = txt;
+			    
+			    this.showW = w;
+			    this.showH = this.h;
+			    this.onClick = clk;
+			}
+			button.prototype.doButtonStuff = function(){
+			    fill(0);
+			    rect(this.x, this.y, this.showW, this.showH, 5);
+			    
+			    fill(255);
+			    rect(this.x, this.y, this.showW-8, this.showH-8, 3);
+			    
+			    fill(0);
+			    text(this.msg, this.x, this.y);
+			    
+			    if(mouseX > this.x - (this.w/2) && mouseX < this.x + (this.w/2) && mouseY > this.y - (this.h/2) && mouseY < this.y + (this.h/2)){
+			        mouse = 'pointer';
+			        
+			        this.showH = lerp(this.showH, this.h+10, 0.2);
+			        
+			        if(clicked){
+			            this.onClick();
+			        }
+			        
+			    }else{
+			        this.showH = lerp(this.showH, this.h, 0.2);
+			    }
+			};
+			
+			var playBtn = new button(width/2, 350, 'PLAY', 330, function(){
+			        frequency = 100;
+			        trans.start('game');
+			        
+			        Player.x = width/2;
+			        Player.y = height/2;
+			        Player.xvel = 0;
+			        Player.yvel = 0;
+			        
+			        score = 0;
+			        
+			        rocks.length = 0;
+			        badRocks.length = 0;
+			        pause = 0;
+			        bits.length = 0;
+			        rings.length = 0;
+			        Player.trail.length = 0;
+			    }),
+			    howBtn = new button(width/2 - 90, 420, 'How', 150, function(){
+			        trans.start('how');
+			    }),
+			    themeBtn = new button(width/2 + 90, 420, 'Theme', 150, function(){
+			        trans.start(function(){
+			            mode = mode === 'light' ? 'dark':'light';
+			        });
+			    }),
+			    homeBtn = new button(width/2, 450, 'Return', 250, function(){
+			        trans.start('home');
+			    }),
+			    againBtn = new button(width/2, 520, 'Replay', 250, function(){
+			        trans.start('game');
+			        
+			        Player.x = width/2;
+			        Player.y = height/2;
+			        Player.xvel = 0;
+			        Player.yvel = 0;
+			        
+			        score = 0;
+			        
+			        rocks.length = 0;
+			        badRocks.length = 0;
+			        pause = 0;
+			        bits.length = 0;
+			        rings.length = 0;
+			        frequency = 100;
+			        Player.trail.length = 0;
+			    });
+			    
+			//scenes
+			function game(){
+			    if(frameCount%300 === 0 && frequency > 50){
+			        frequency --;
+			    }
+			    
+			    
+			    pushMatrix();
+			    translate(random(-shake, shake), random(-shake, shake));
+			    
+			    fill(colors[mode].score);
+			    pushMatrix();
+			    translate(width/2, height/2);
+			    scale(scoreSize);
+			    textFont(fonts.main, width/2);
+			    text(score, 0, 0);
+			    popMatrix();
+			    
+			    runBits();
+			    runRings();
+			    
+			    for(var i = rocks.length-1; i >= 0; --i){
+			        rocks[i].draw();
+			        
+			        if(pause < 20){
+			            rocks[i].update();
+			        }
+			        
+			        if(rocks[i].dead){
+			            rocks.splice(i, 1); 
+			            continue;
+			        }
+			    }
+			    
+			    for(var i = badRocks.length-1; i >= 0; --i){
+			        badRocks[i].draw();
+			        
+			        if(pause < 20){
+			            badRocks[i].update();
+			        }
+			        
+			        if(badRocks[i].dead){
+			            badRocks.splice(i, 1); 
+			            continue;
+			        }
+			    }
+			    
+			    Player.draw();
+			    
+			    
+			    if(pause < 20){
+			        Player.update();
+			    }
+			    
+			    if(shake > 0){
+			        shake -= 0.5;
+			    }
+			    
+			    if(pause < 50){
+			        if(frameCount%frequency === 0){
+			            rocks.push(new rock());
+			        }
+			        
+			        if(frameCount%frequency === 0){
+			            badRocks.push(new badRock());
+			        }
+			    }
+			    
+			    scoreSize = lerp(scoreSize, 1, 0.2);
+			    
+			    shake = constrain(shake, 0, 10);
+			    popMatrix();
+			    
+			    
+			    fill(mode === 'dark' ? 255:0, 50);
+			    ellipse(width-50, 50, pause+60, pause+60);
+			    
+			    fill(mode === 'dark' ? 0:255, 50);
+			    ellipse(width-50, 50, pause+50, pause+50);
+			    
+			    fill(mode === 'dark' ? 255:0, 50);
+			    rect(width-50 - 6, 50, 6, 24);
+			    rect(width-50 + 6, 50, 6, 24);
+			    
+			    textFont(fonts.dark, 80);
+			    fill(mode === 'dark' ? 255:0);
+			    text('Game Paused', width/2, height/2+ height*5-pause);
+			    
+			    if(dist(mouseX, mouseY, width-50, 50) < 25){
+			        pause = lerp(pause, height*5, 0.1);
+			    }else{
+			        pause = lerp(pause, 0, 0.1);
+			    }
+			    
+			}
+			function home(){
+			    
+			    
+			    textFont(fonts.main, 140);
+			    
+			    fill(colors[mode].contrast);
+			    text('B  ing', width/2, 150);
+			    rect(width/2 - 32, 226, 264, 10);
+			    
+			    textSize(20);
+			    text('Highscore: '+highscore, width/2, height-15);
+			    
+			    fill(colors[mode].player);
+			    ellipse(width/2 - 55, 170, 70, 70);
+			    fill(colors[mode].player, 50);
+			    ellipse(width/2 - 26, 99, 50, 50);
+			    ellipse(width/2 + 26, 68, 40, 40);
+			    ellipse(width/2 + 79, 73, 30, 30);
+			    ellipse(width/2 + 108, 107, 20, 20);
+			    
+			    textFont(fonts.dark, 30);
+			    playBtn.doButtonStuff();
+			    howBtn.doButtonStuff();
+			    themeBtn.doButtonStuff();
+			}
+			function over(){
+			    textFont(fonts.dark, 80);
+			    fill(colors[mode].contrast);
+			    text('Game Over', width/2, 150);
+			    
+			    pushMatrix();
+			    translate(width/2, height/2);
+			    scale(scoreSize);
+			    textFont(fonts.main, 40);
+			    text('Score: '+score, 0, 0);
+			    popMatrix();
+			    
+			    textSize(20);
+			    text('Highscore: '+highscore, width/2, height/2+45);
+			    
+			    scoreSize = lerp(scoreSize, 1.5, 0.2);
+			    
+			    textFont(fonts.dark, 30);
+			    homeBtn.doButtonStuff();
+			    againBtn.doButtonStuff();
+			}
+			function how(){
+			    textFont(fonts.dark, 80);
+			    fill(colors[mode].contrast);
+			    text('Instructions', width/2, 150);
+			    
+			    textFont(fonts.main);
+			    textSize(30);
+			    text('Use your mouse to move.\nDo not touch red squares.\nCollect Orange Circles.\nHit Circles inside a ring\nfor a 5 point combo', width/2, height/2+45);
+			    
+			    scoreSize = lerp(scoreSize, 1.5, 0.2);
+			    
+			    textFont(fonts.dark, 30);
+			    homeBtn.y = 550;
+			    homeBtn.doButtonStuff();
+			    homeBtn.y = 450;
+			}
+			
+			function draw(){
+			    frameStart = millis();
+			    
+			    background(colors[mode].bg);
+			    fill(mode === 'light' ? colors[mode].bg - 10 : colors[mode].bg + 5);
+			    ellipse(100, 0, 500, 500);
+			    ellipse(533, 0, 200, 200);
+			    ellipse(166, height, 300, 300);
+			    ellipse(469, 329, 250, 250);
+			    
+			    switch(scene){
+			        case 'home':
+			            home();
+			        break;
+			        case 'game':
+			            game();
+			        break;
+			        case 'over':
+			            over();
+			        break;
+			        case 'how':
+			            how();
+			        break;
+			    }
+			    
+			    frameEnd = millis()-frameStart;
+			    
+			
+			    cursor(mouse);
+			    mouse = '';
+			    clicked = false;
+			    
+			    trans.all();
+			}
+			
+			
+			mouseClicked = function(){
+			    clicked = true;
+			};
+			
+		}
+		
+		runPJS(program);
+		
+		// Add reload button on KA --> <script>
+		
+	</script>
+</body>
+
+</html>
